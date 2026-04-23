@@ -1,75 +1,122 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>IEEE UPNM - Multi-Node Monitor</title>
+    <title>HEABUD - Multi-Node Health Hub</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0b0e11; color: #e1e1e1; text-align: center; margin: 0; padding: 20px; }
-        h1 { color: #00ff88; text-transform: uppercase; margin-bottom: 10px; }
-        
-        .panel { background: #1c2128; padding: 15px; border-radius: 8px; display: inline-block; margin-bottom: 20px; border: 1px solid #30363d; }
-        .settings-input { background: #0b0e11; color: #00ff88; border: 1px solid #30363d; padding: 5px; border-radius: 4px; margin-left: 10px; }
-        
-        .section-header { color: #00ff88; font-size: 1.5em; text-align: left; width: 95%; max-width: 1100px; margin: 30px auto 10px auto; border-bottom: 2px solid #30363d; padding-bottom: 5px; display: flex; justify-content: space-between; }
-        
-        .dashboard { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; max-width: 1200px; margin: 0 auto; }
-        
-        .card { background: #1c2128; border: 1px solid #30363d; border-radius: 12px; padding: 15px; min-width: 180px; flex: 1; }
-        .label { font-size: 0.8em; color: #8b949e; text-transform: uppercase; }
-        .value { font-size: 2em; font-weight: bold; color: #ffffff; margin-top: 5px; }
-        .unit { font-size: 0.5em; color: #00ff88; margin-left: 5px; }
+        :root {
+            --bg-color: #0b0e11;
+            --card-bg: #1c2128;
+            --accent: #00ff88;
+            --border: #30363d;
+            --text-main: #e1e1e1;
+            --text-dim: #8b949e;
+        }
 
-        button { background: #00ff88; color: #0b0e11; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        canvas { max-width: 1100px; margin: 20px auto; background: #1c2128; border-radius: 12px; padding: 10px; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px; }
+        
+        header { border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+        
+        h1 { color: var(--accent); margin: 0; font-size: 1.5em; letter-spacing: 1px; }
+
+        .control-panel { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 30px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+
+        .input-group { text-align: left; }
+        .input-group label { display: block; font-size: 0.7em; color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; }
+        
+        input { background: var(--bg-color); color: var(--accent); border: 1px solid var(--border); padding: 8px; border-radius: 5px; outline: none; }
+
+        button { background: var(--accent); color: var(--bg-color); border: none; padding: 10px 25px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { opacity: 0.8; transform: scale(1.05); }
+
+        /* Unit Sections */
+        .node-container { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        
+        .unit-section { text-align: left; }
+        .unit-title { color: var(--accent); font-size: 1.2em; margin-bottom: 15px; border-left: 4px solid var(--accent); padding-left: 10px; }
+
+        .dashboard { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 15px; }
+        .label { font-size: 0.75em; color: var(--text-dim); text-transform: uppercase; }
+        .value { font-size: 2em; font-weight: bold; margin-top: 5px; }
+        .unit-label { font-size: 0.4em; color: var(--accent); margin-left: 4px; }
+
+        /* Graph Area */
+        .chart-container { max-width: 1200px; margin: 40px auto; background: var(--card-bg); border-radius: 15px; padding: 20px; border: 1px solid var(--border); }
+        
+        @media (max-width: 768px) {
+            .node-container { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
 
-    <h1>Health Monitoring Hub</h1>
-    
-    <div class="panel">
+    <header>
+        <h1>IEEE UPNM - HEABUD HUB</h1>
+        <div id="connectionStatus" style="color: var(--text-dim); font-size: 0.9em;">Receiver: Disconnected</div>
+    </header>
+
+    <div class="control-panel">
         <button onclick="initSerial()">CONNECT RECEIVER</button>
-        <span style="margin-left:20px;">Rename Label:</span>
-        <input type="text" id="nameInput" class="settings-input" placeholder="e.g. Patient Alpha" oninput="updateLabel()">
+        
+        <div class="input-group">
+            <label>Rename Unit 1</label>
+            <input type="text" id="u1NameInput" placeholder="Wearable Node" oninput="renameUnits()">
+        </div>
+
+        <div class="input-group">
+            <label>Rename Unit 2</label>
+            <input type="text" id="u2NameInput" placeholder="Remote Node" oninput="renameUnits()">
+        </div>
     </div>
 
-    <div class="section-header">
-        <span id="unit1Label">UNIT 1 - WEARABLE NODE</span>
-        <span style="font-size: 0.5em; color: #8b949e;">ID: 01</span>
-    </div>
-    <div class="dashboard">
-        <div class="card"><div class="label">BPM</div><div id="u1_bpm" class="value">--</div></div>
-        <div class="card"><div class="label">O2 %</div><div id="u1_spo2" class="value">--</div></div>
-        <div class="card"><div class="label">Temp</div><div id="u1_temp" class="value">--</div></div>
-        <div class="card"><div class="label">Signal</div><div id="u1_rssi" class="value">--</div></div>
+    <div class="node-container">
+        <div class="unit-section">
+            <div id="u1Title" class="unit-title">UNIT 1 - WEARABLE NODE</div>
+            <div class="dashboard">
+                <div class="card"><div class="label">Heart Rate</div><div id="u1_bpm" class="value">--<span class="unit-label">BPM</span></div></div>
+                <div class="card"><div class="label">Oxygen</div><div id="u1_spo2" class="value">--<span class="unit-label">%</span></div></div>
+                <div class="card"><div class="label">Temp</div><div id="u1_temp" class="value">--<span class="unit-label">°C</span></div></div>
+                <div class="card"><div class="label">RSSI</div><div id="u1_rssi" class="value">--<span class="unit-label">dBm</span></div></div>
+            </div>
+        </div>
+
+        <div class="unit-section">
+            <div id="u2Title" class="unit-title">UNIT 2 - REMOTE NODE</div>
+            <div class="dashboard">
+                <div class="card"><div class="label">Heart Rate</div><div id="u2_bpm" class="value">--<span class="unit-label">BPM</span></div></div>
+                <div class="card"><div class="label">Oxygen</div><div id="u2_spo2" class="value">--<span class="unit-label">%</span></div></div>
+                <div class="card"><div class="label">Temp</div><div id="u2_temp" class="value">--<span class="unit-label">°C</span></div></div>
+                <div class="card"><div class="label">RSSI</div><div id="u2_rssi" class="value">--<span class="unit-label">dBm</span></div></div>
+            </div>
+        </div>
     </div>
 
-    <div class="section-header">
-        <span>UNIT 2 - REMOTE NODE</span>
-        <span style="font-size: 0.5em; color: #8b949e;">ID: 02</span>
+    <div class="chart-container">
+        <h3 style="text-align: left; color: var(--accent);">Live Telemetry Graph</h3>
+        <canvas id="healthChart"></canvas>
     </div>
-    <div class="dashboard">
-        <div class="card"><div class="label">BPM</div><div id="u2_bpm" class="value">--</div></div>
-        <div class="card"><div class="label">O2 %</div><div id="u2_spo2" class="value">--</div></div>
-        <div class="card"><div class="label">Temp</div><div id="u2_temp" class="value">--</div></div>
-        <div class="card"><div class="label">Signal</div><div id="u2_rssi" class="value">--</div></div>
-    </div>
-
-    <canvas id="liveChart"></canvas>
 
     <script>
         let chart;
-        let u1History = [];
+        let u1Data = Array(20).fill(0);
+        let u2Data = Array(20).fill(0);
 
-        function updateLabel() {
-            const input = document.getElementById('nameInput').value;
-            document.getElementById('unit1Label').innerText = input || "UNIT 1 - WEARABLE NODE";
+        function renameUnits() {
+            const u1 = document.getElementById('u1NameInput').value;
+            const u2 = document.getElementById('u2NameInput').value;
+            if(u1) document.getElementById('u1Title').innerText = u1.toUpperCase();
+            if(u2) document.getElementById('u2Title').innerText = u2.toUpperCase();
         }
 
         async function initSerial() {
             try {
                 const port = await navigator.serial.requestPort();
                 await port.open({ baudRate: 115200 });
+                document.getElementById('connectionStatus').innerText = "Receiver: ONLINE";
+                document.getElementById('connectionStatus').style.color = "#00ff88";
+                
                 setupChart();
                 const reader = port.readable.getReader();
                 const decoder = new TextDecoder();
@@ -84,38 +131,53 @@
                         lines.forEach(line => {
                             try {
                                 const json = JSON.parse(line);
-                                updateDashboard(json);
+                                updateUI(json);
                             } catch(e) {}
                         });
                     }
                 }
-            } catch (err) { console.log(err); }
+            } catch (err) {
+                alert("Serial Connection Failed. Try again.");
+            }
         }
 
         function setupChart() {
-            const ctx = document.getElementById('liveChart').getContext('2d');
+            const ctx = document.getElementById('healthChart').getContext('2d');
             chart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: Array(20).fill(''),
-                    datasets: [{ label: 'Unit 1 BPM', data: u1History, borderColor: '#00ff88', tension: 0.4 }]
+                    datasets: [
+                        { label: 'Unit 1 BPM', data: u1Data, borderColor: '#00ff88', tension: 0.4, fill: false },
+                        { label: 'Unit 2 BPM', data: u2Data, borderColor: '#00aaff', tension: 0.4, fill: false }
+                    ]
                 },
-                options: { responsive: true, animation: false }
+                options: { 
+                    responsive: true, 
+                    animation: false,
+                    scales: { y: { min: 40, max: 160, grid: { color: '#30363d' } } }
+                }
             });
         }
 
-        function updateDashboard(json) {
-            // Check if data is for Unit 1 or Unit 2 based on an "id" key
-            const prefix = (json.id === 2) ? "u2_" : "u1_";
+        function updateUI(json) {
+            const id = json.id || 1;
+            const prefix = "u" + id + "_";
             
-            if(json.bpm) document.getElementById(prefix + 'bpm').innerText = json.bpm;
-            if(json.spo2) document.getElementById(prefix + 'spo2').innerText = json.spo2;
-            if(json.temp) document.getElementById(prefix + 'temp').innerText = json.temp;
-            if(json.rssi) document.getElementById(prefix + 'rssi').innerText = json.rssi;
+            if(json.bpm) document.getElementById(prefix + 'bpm').innerHTML = json.bpm + '<span class="unit-label">BPM</span>';
+            if(json.spo2) document.getElementById(prefix + 'spo2').innerHTML = json.spo2 + '<span class="unit-label">%</span>';
+            if(json.temp) document.getElementById(prefix + 'temp').innerHTML = json.temp + '<span class="unit-label">°C</span>';
+            if(json.rssi) document.getElementById(prefix + 'rssi').innerHTML = json.rssi + '<span class="unit-label">dBm</span>';
 
-            if(json.id !== 2 && json.bpm) {
-                u1History.push(json.bpm);
-                if (u1History.length > 20) u1History.shift();
+            // Graph Update
+            if(json.bpm) {
+                if(id === 1) {
+                    u1Data.push(json.bpm);
+                    u1Data.shift();
+                } else {
+                    u2Data.push(json.bpm);
+                    u2Data.shift();
+                }
                 chart.update();
             }
         }
