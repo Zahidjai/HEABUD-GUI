@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>HEABUD - Pro Health Hub</title>
+    <title>HEABUD - Emergency Alert Hub</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
@@ -13,239 +13,209 @@
             --text-main: #e1e1e1;
             --text-dim: #8b949e;
             --danger: #ff4d4d;
+            --warning: #ffcc00;
         }
 
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; overflow-x: hidden; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; overflow-x: hidden; }
         
-        /* Header */
-        header { padding: 20px 40px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-color); position: sticky; top: 0; z-index: 10; }
-        .logo-group { display: flex; align-items: center; gap: 15px; }
-        .settings-btn { font-size: 24px; cursor: pointer; color: var(--text-dim); transition: 0.3s; }
-        .settings-btn:hover { color: var(--accent); transform: rotate(45deg); }
+        /* Alert Overlay Styling */
+        #alertOverlay { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 400px; display: none; }
+        .alert-popup { background: var(--danger); color: white; padding: 20px; border-radius: 12px; box-shadow: 0 10px 40px rgba(255,0,0,0.4); text-align: center; border: 2px solid white; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
-        /* Sidebar */
-        #sidebar { position: fixed; right: -350px; top: 0; width: 300px; height: 100%; background: var(--card-bg); border-left: 1px solid var(--border); transition: 0.3s; padding: 25px; z-index: 100; overflow-y: auto; box-shadow: -10px 0 30px rgba(0,0,0,0.5); }
-        #sidebar.open { right: 0; }
-        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-        
-        /* Settings Elements */
-        .setting-item { margin-bottom: 25px; padding: 15px; background: var(--bg-color); border-radius: 8px; border: 1px solid var(--border); }
-        .setting-item h4 { margin: 0 0 10px 0; font-size: 0.8em; color: var(--accent); }
-        input { background: #1c2128; color: white; border: 1px solid var(--border); padding: 8px; width: 80%; border-radius: 4px; }
-        .btn-sm { padding: 5px 10px; font-size: 0.7em; margin-top: 10px; display: inline-block; }
-        .remove-btn { color: var(--danger); cursor: pointer; font-size: 0.8em; margin-top: 10px; display: block; }
+        /* Dynamic Status Colors */
+        .status-normal { border-color: var(--border); }
+        .status-yellow { background: #4d3d00 !important; border-color: var(--warning) !important; }
+        .status-red { background: #4d0000 !important; border-color: var(--danger) !important; animation: flash-red 2s infinite; }
+        @keyframes flash-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+        .metric-danger { color: var(--danger) !important; font-weight: 900; }
 
-        /* Main Dashboard */
+        /* General Layout */
+        header { padding: 20px 40px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-color); sticky; top: 0; z-index: 10; }
         .main-content { padding: 40px; }
         .node-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
-        .unit-card { background: var(--card-bg); border-radius: 15px; border: 1px solid var(--border); padding: 20px; transition: 0.3s; }
-        .unit-card:hover { border-color: var(--accent); }
-        .unit-card.active-graph { border: 2px solid var(--accent); box-shadow: 0 0 15px rgba(0,255,136,0.2); }
-        
+        .unit-card { background: var(--card-bg); border-radius: 15px; border: 2px solid var(--border); padding: 20px; transition: 0.3s; position: relative; }
+        .rescue-text { color: var(--accent); font-weight: bold; font-size: 0.8em; text-transform: uppercase; margin-bottom: 10px; display: none; }
+
         .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .metric { background: var(--bg-color); padding: 15px; border-radius: 10px; text-align: center; cursor: pointer; }
+        .metric { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; text-align: center; }
         .metric .val { font-size: 1.8em; font-weight: bold; }
         .metric .lab { font-size: 0.6em; color: var(--text-dim); text-transform: uppercase; }
 
-        /* Buttons */
         button { background: var(--accent); color: var(--bg-color); border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        .btn-add { width: 100%; margin-top: 10px; }
+        .assist-btn { background: white; color: black; margin-top: 15px; }
 
-        /* Chart */
-        .chart-container { margin-top: 40px; background: var(--card-bg); padding: 20px; border-radius: 15px; border: 1px solid var(--border); }
+        #sidebar { position: fixed; right: -350px; top: 0; width: 300px; height: 100%; background: var(--card-bg); border-left: 1px solid var(--border); transition: 0.3s; padding: 25px; z-index: 100; overflow-y: auto; }
+        #sidebar.open { right: 0; }
     </style>
 </head>
 <body>
 
-    <header>
-        <div class="logo-group">
-            <i class="ph ph-activity" style="color: var(--accent); font-size: 28px;"></i>
-            <h1>HEABUD HUB <span style="font-size: 0.5em; color: var(--text-dim);">PRO</span></h1>
+    <div id="alertOverlay">
+        <div class="alert-popup">
+            <h2 id="alertText">UNIT X IN DANGER</h2>
+            <button class="assist-btn" onclick="muteEmergency()">ASSIST UNIT</button>
         </div>
-        <div style="display: flex; align-items: center; gap: 20px;">
-            <button onclick="initSerial()">CONNECT RECEIVER</button>
-            <i class="ph ph-gear settings-btn" onclick="toggleSidebar()"></i>
+    </div>
+
+    <header>
+        <div style="display:flex; align-items:center; gap:15px">
+            <i class="ph ph-shield-check" style="color:var(--accent); font-size:28px"></i>
+            <h1>HEABUD COMMAND</h1>
+        </div>
+        <div style="display:flex; gap:20px; align-items:center">
+            <button onclick="initSerial()">CONNECT HUB</button>
+            <i class="ph ph-gear" style="cursor:pointer; font-size:24px" onclick="toggleSidebar()"></i>
         </div>
     </header>
 
     <div id="sidebar">
-        <div class="sidebar-header">
-            <h3>Configuration</h3>
-            <i class="ph ph-x" style="cursor:pointer" onclick="toggleSidebar()"></i>
-        </div>
-        
-        <div id="unitSettingsList">
-            </div>
-
-        <button class="btn-add" onclick="addNewUnit()">+ ADD NEW UNIT</button>
+        <h3>System Settings</h3>
+        <div id="settingsList"></div>
+        <button style="width:100%; margin-top:10px" onclick="addNewUnit()">+ ADD UNIT</button>
     </div>
 
     <div class="main-content">
-        <div id="nodeGrid" class="node-grid">
-            </div>
-
-        <div class="chart-container">
-            <h4 id="graphTitle" style="color: var(--accent); margin-top: 0;">SELECT A UNIT TO GRAPH</h4>
-            <canvas id="healthChart" height="100"></canvas>
+        <div id="nodeGrid" class="node-grid"></div>
+        <div style="margin-top:40px; background:var(--card-bg); padding:20px; border-radius:15px">
+            <canvas id="healthChart" height="80"></canvas>
         </div>
     </div>
 
     <script>
-        let units = [
-            { id: 1, name: "Unit 1", bpm: 0, spo2: 0, temp: 0, rssi: 0, history: [] }
-        ];
+        let units = [{ id: 1, name: "Unit 1", bpm: 0, spo2: 0, temp: 0, rssi: 0, history: [], assisted: false }];
+        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let beepInterval = null;
         let chart;
-        let activeGraphId = 1;
+
+        const THRESHOLDS = {
+            bpm: { min: 60, max: 100 },
+            spo2: { min: 95, max: 100 },
+            temp: { min: 36.0, max: 37.8 }
+        };
 
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 
         function renderUI() {
             const grid = document.getElementById('nodeGrid');
-            const settingsList = document.getElementById('unitSettingsList');
-            grid.innerHTML = "";
-            settingsList.innerHTML = "";
+            const settings = document.getElementById('settingsList');
+            grid.innerHTML = ""; settings.innerHTML = "";
 
             units.forEach(u => {
-                // Render Cards
-                const card = document.createElement('div');
-                card.className = `unit-card ${activeGraphId === u.id ? 'active-graph' : ''}`;
-                card.innerHTML = `
-                    <div style="display:flex; justify-content:space-between">
-                        <strong style="color:var(--accent)">${u.name}</strong>
-                        <span style="font-size:0.7em; color:var(--text-dim)">ID: 0${u.id}</span>
-                    </div>
-                    <div class="metric-grid">
-                        <div class="metric" onclick="setActiveGraph(${u.id})">
-                            <div class="lab">Heart Rate</div>
-                            <div class="val">${u.bpm || '--'} <small style="font-size:0.4em">BPM</small></div>
+                let violations = 0;
+                const vBpm = (u.bpm < THRESHOLDS.bpm.min || u.bpm > THRESHOLDS.bpm.max) && u.bpm != 0;
+                const vSpo2 = (u.spo2 < THRESHOLDS.spo2.min) && u.spo2 != 0;
+                const vTemp = (u.temp < THRESHOLDS.temp.min || u.temp > THRESHOLDS.temp.max) && u.temp != 0;
+                
+                if(vBpm) violations++; if(vSpo2) violations++; if(vTemp) violations++;
+
+                let cardClass = "status-normal";
+                if(violations === 1) cardClass = "status-yellow";
+                if(violations >= 2) cardClass = "status-red";
+
+                if(violations === 3 && !u.assisted) triggerEmergency(u.name);
+
+                grid.innerHTML += `
+                    <div class="unit-card ${cardClass}">
+                        <div class="rescue-text" id="rescue_${u.id}" style="display: ${u.assisted ? 'block' : 'none'}">
+                            <i class="ph ph-paper-plane-tilt"></i> Signal to the rescue team sent
                         </div>
-                        <div class="metric">
-                            <div class="lab">Oxygen</div>
-                            <div class="val">${u.spo2 || '--'} <small style="font-size:0.4em">%</small></div>
+                        <div style="display:flex; justify-content:space-between">
+                            <strong>${u.name}</strong>
+                            <span style="font-size:0.7em">ID: 0${u.id}</span>
                         </div>
-                        <div class="metric">
-                            <div class="lab">Temperature</div>
-                            <div class="val">${u.temp || '--'} <small style="font-size:0.4em">°C</small></div>
-                        </div>
-                        <div class="metric">
-                            <div class="lab">Signal</div>
-                            <div class="val">${u.rssi || '--'} <small style="font-size:0.4em">dBm</small></div>
+                        <div class="metric-grid">
+                            <div class="metric ${vBpm ? 'metric-danger' : ''}">
+                                <div class="lab">HR (BPM)</div><div class="val">${u.bpm || '--'}</div>
+                            </div>
+                            <div class="metric ${vSpo2 ? 'metric-danger' : ''}">
+                                <div class="lab">SpO2 (%)</div><div class="val">${u.spo2 || '--'}</div>
+                            </div>
+                            <div class="metric ${vTemp ? 'metric-danger' : ''}">
+                                <div class="lab">Temp (°C)</div><div class="val">${u.temp || '--'}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="lab">Signal</div><div class="val">${u.rssi || '--'}</div>
+                            </div>
                         </div>
                     </div>
                 `;
-                grid.appendChild(card);
 
-                // Render Settings
-                const setItem = document.createElement('div');
-                setItem.className = "setting-item";
-                setItem.innerHTML = `
-                    <h4>Unit ID: 0${u.id}</h4>
-                    <input type="text" value="${u.name}" onchange="renameUnit(${u.id}, this.value)">
-                    <div style="display:flex; gap:10px">
-                        <button class="btn-sm" onclick="exportData(${u.id}, 'csv')">EXCEL (CSV)</button>
-                        <button class="btn-sm" onclick="exportData(${u.id}, 'txt')">TEXT</button>
+                settings.innerHTML += `
+                    <div style="background:var(--bg-color); padding:10px; margin-bottom:10px; border-radius:5px">
+                        <input type="text" value="${u.name}" onchange="renameUnit(${u.id}, this.value)" style="width:90%">
+                        <button style="font-size:0.6em; margin-top:5px" onclick="removeUnit(${u.id})">REMOVE</button>
                     </div>
-                    <span class="remove-btn" onclick="removeUnit(${u.id})">Remove Unit</span>
                 `;
-                settingsList.appendChild(setItem);
             });
-            
-            const activeUnit = units.find(u => u.id === activeGraphId);
-            if(activeUnit) document.getElementById('graphTitle').innerText = "LIVE GRAPH: " + activeUnit.name.toUpperCase();
         }
 
-        function addNewUnit() {
-            const nextId = units.length > 0 ? Math.max(...units.map(u => u.id)) + 1 : 1;
-            units.push({ id: nextId, name: `Unit ${nextId}`, bpm: 0, spo2: 0, temp: 0, rssi: 0, history: [] });
-            renderUI();
+        function triggerEmergency(name) {
+            document.getElementById('alertOverlay').style.display = "block";
+            document.getElementById('alertText').innerText = name + " IS IN DANGER";
+            if (!beepInterval) {
+                beepInterval = setInterval(() => {
+                    playBeep(800, 200);
+                }, 500);
+            }
         }
 
-        function removeUnit(id) {
-            units = units.filter(u => u.id !== id);
-            if (activeGraphId === id && units.length > 0) activeGraphId = units[0].id;
-            renderUI();
-        }
-
-        function renameUnit(id, newName) {
-            const unit = units.find(u => u.id === id);
-            if(unit) unit.name = newName;
-            renderUI();
-        }
-
-        function setActiveGraph(id) {
-            activeGraphId = id;
-            renderUI();
-            updateChart();
-        }
-
-        function exportData(id, format) {
-            const unit = units.find(u => u.id === id);
-            let content = format === 'csv' ? "Timestamp,BPM\n" : `Data Log for ${unit.name}\n\n`;
-            
-            unit.history.forEach((val, i) => {
-                content += format === 'csv' ? `${i},${val}\n` : `Reading ${i}: ${val} BPM\n`;
+        function muteEmergency() {
+            document.getElementById('alertOverlay').style.display = "none";
+            clearInterval(beepInterval);
+            beepInterval = null;
+            units.forEach(u => {
+                u.assisted = true;
+                document.getElementById('rescue_' + u.id).style.display = "block";
             });
-
-            const blob = new Blob([content], { type: 'text/plain' });
-            const elem = window.document.createElement('a');
-            elem.href = window.URL.createObjectURL(blob);
-            elem.download = `${unit.name}_Data.${format}`;
-            document.body.appendChild(elem);
-            elem.click();
-            document.body.removeChild(elem);
+            renderUI();
         }
 
-        // --- Serial & Chart Logic ---
+        function playBeep(freq, duration) {
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.frequency.value = freq;
+            osc.start();
+            setTimeout(() => osc.stop(), duration);
+        }
+
         async function initSerial() {
             const port = await navigator.serial.requestPort();
             await port.open({ baudRate: 115200 });
-            setupChart();
             const reader = port.readable.getReader();
             const decoder = new TextDecoder();
             let buffer = "";
-
             while (true) {
                 const { value, done } = await reader.read();
                 buffer += decoder.decode(value);
                 if (buffer.includes('\n')) {
-                    let lines = buffer.split('\n');
-                    buffer = lines.pop(); 
+                    let lines = buffer.split('\n'); buffer = lines.pop(); 
                     lines.forEach(line => {
                         try {
                             const json = JSON.parse(line);
-                            const unit = units.find(u => u.id === json.id);
+                            let unit = units.find(u => u.id === json.id);
                             if(unit) {
                                 unit.bpm = json.bpm; unit.spo2 = json.spo2; 
                                 unit.temp = json.temp; unit.rssi = json.rssi;
-                                unit.history.push(json.bpm);
-                                if(unit.history.length > 30) unit.history.shift();
-                                if(unit.id === activeGraphId) updateChart();
+                                renderUI();
                             }
-                            renderUI();
                         } catch(e) {}
                     });
                 }
             }
         }
 
-        function setupChart() {
-            const ctx = document.getElementById('healthChart').getContext('2d');
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: { labels: Array(30).fill(''), datasets: [{ label: 'Heart Rate', data: [], borderColor: '#00ff88', tension: 0.4 }] },
-                options: { animation: false, scales: { y: { min: 40, max: 160 } } }
-            });
+        function addNewUnit() {
+            const id = units.length + 1;
+            units.push({ id: id, name: "Unit " + id, bpm: 0, spo2: 0, temp: 0, rssi: 0, history: [], assisted: false });
+            renderUI();
         }
 
-        function updateChart() {
-            const unit = units.find(u => u.id === activeGraphId);
-            if(chart && unit) {
-                chart.data.datasets[0].data = unit.history;
-                chart.update();
-            }
+        function renameUnit(id, name) { 
+            let u = units.find(x => x.id === id); if(u) u.name = name; renderUI(); 
         }
 
-        // Initial Boot
         renderUI();
     </script>
 </body>
