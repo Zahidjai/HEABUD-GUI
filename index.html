@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>HEABUD - Multi-Node Health Hub</title>
+    <title>HEABUD - Pro Health Hub</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         :root {
             --bg-color: #0b0e11;
@@ -11,133 +12,219 @@
             --border: #30363d;
             --text-main: #e1e1e1;
             --text-dim: #8b949e;
+            --danger: #ff4d4d;
         }
 
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; overflow-x: hidden; }
         
-        header { border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+        /* Header */
+        header { padding: 20px 40px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-color); position: sticky; top: 0; z-index: 10; }
+        .logo-group { display: flex; align-items: center; gap: 15px; }
+        .settings-btn { font-size: 24px; cursor: pointer; color: var(--text-dim); transition: 0.3s; }
+        .settings-btn:hover { color: var(--accent); transform: rotate(45deg); }
+
+        /* Sidebar */
+        #sidebar { position: fixed; right: -350px; top: 0; width: 300px; height: 100%; background: var(--card-bg); border-left: 1px solid var(--border); transition: 0.3s; padding: 25px; z-index: 100; overflow-y: auto; box-shadow: -10px 0 30px rgba(0,0,0,0.5); }
+        #sidebar.open { right: 0; }
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
         
-        h1 { color: var(--accent); margin: 0; font-size: 1.5em; letter-spacing: 1px; }
+        /* Settings Elements */
+        .setting-item { margin-bottom: 25px; padding: 15px; background: var(--bg-color); border-radius: 8px; border: 1px solid var(--border); }
+        .setting-item h4 { margin: 0 0 10px 0; font-size: 0.8em; color: var(--accent); }
+        input { background: #1c2128; color: white; border: 1px solid var(--border); padding: 8px; width: 80%; border-radius: 4px; }
+        .btn-sm { padding: 5px 10px; font-size: 0.7em; margin-top: 10px; display: inline-block; }
+        .remove-btn { color: var(--danger); cursor: pointer; font-size: 0.8em; margin-top: 10px; display: block; }
 
-        .control-panel { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 30px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
-
-        .input-group { text-align: left; }
-        .input-group label { display: block; font-size: 0.7em; color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; }
+        /* Main Dashboard */
+        .main-content { padding: 40px; }
+        .node-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+        .unit-card { background: var(--card-bg); border-radius: 15px; border: 1px solid var(--border); padding: 20px; transition: 0.3s; }
+        .unit-card:hover { border-color: var(--accent); }
+        .unit-card.active-graph { border: 2px solid var(--accent); box-shadow: 0 0 15px rgba(0,255,136,0.2); }
         
-        input { background: var(--bg-color); color: var(--accent); border: 1px solid var(--border); padding: 8px; border-radius: 5px; outline: none; }
+        .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .metric { background: var(--bg-color); padding: 15px; border-radius: 10px; text-align: center; cursor: pointer; }
+        .metric .val { font-size: 1.8em; font-weight: bold; }
+        .metric .lab { font-size: 0.6em; color: var(--text-dim); text-transform: uppercase; }
 
-        button { background: var(--accent); color: var(--bg-color); border: none; padding: 10px 25px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button:hover { opacity: 0.8; transform: scale(1.05); }
+        /* Buttons */
+        button { background: var(--accent); color: var(--bg-color); border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .btn-add { width: 100%; margin-top: 10px; }
 
-        /* Unit Sections */
-        .node-container { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
-        
-        .unit-section { text-align: left; }
-        .unit-title { color: var(--accent); font-size: 1.2em; margin-bottom: 15px; border-left: 4px solid var(--accent); padding-left: 10px; }
-
-        .dashboard { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
-        
-        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 15px; }
-        .label { font-size: 0.75em; color: var(--text-dim); text-transform: uppercase; }
-        .value { font-size: 2em; font-weight: bold; margin-top: 5px; }
-        .unit-label { font-size: 0.4em; color: var(--accent); margin-left: 4px; }
-
-        /* Graph Area */
-        .chart-container { max-width: 1200px; margin: 40px auto; background: var(--card-bg); border-radius: 15px; padding: 20px; border: 1px solid var(--border); }
-        
-        @media (max-width: 768px) {
-            .node-container { grid-template-columns: 1fr; }
-        }
+        /* Chart */
+        .chart-container { margin-top: 40px; background: var(--card-bg); padding: 20px; border-radius: 15px; border: 1px solid var(--border); }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>IEEE UPNM - HEABUD HUB</h1>
-        <div id="connectionStatus" style="color: var(--text-dim); font-size: 0.9em;">Receiver: Disconnected</div>
+        <div class="logo-group">
+            <i class="ph ph-activity" style="color: var(--accent); font-size: 28px;"></i>
+            <h1>HEABUD HUB <span style="font-size: 0.5em; color: var(--text-dim);">PRO</span></h1>
+        </div>
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <button onclick="initSerial()">CONNECT RECEIVER</button>
+            <i class="ph ph-gear settings-btn" onclick="toggleSidebar()"></i>
+        </div>
     </header>
 
-    <div class="control-panel">
-        <button onclick="initSerial()">CONNECT RECEIVER</button>
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <h3>Configuration</h3>
+            <i class="ph ph-x" style="cursor:pointer" onclick="toggleSidebar()"></i>
+        </div>
         
-        <div class="input-group">
-            <label>Rename Unit 1</label>
-            <input type="text" id="u1NameInput" placeholder="Wearable Node" oninput="renameUnits()">
-        </div>
+        <div id="unitSettingsList">
+            </div>
 
-        <div class="input-group">
-            <label>Rename Unit 2</label>
-            <input type="text" id="u2NameInput" placeholder="Remote Node" oninput="renameUnits()">
-        </div>
+        <button class="btn-add" onclick="addNewUnit()">+ ADD NEW UNIT</button>
     </div>
 
-    <div class="node-container">
-        <div class="unit-section">
-            <div id="u1Title" class="unit-title">UNIT 1 - WEARABLE NODE</div>
-            <div class="dashboard">
-                <div class="card"><div class="label">Heart Rate</div><div id="u1_bpm" class="value">--<span class="unit-label">BPM</span></div></div>
-                <div class="card"><div class="label">Oxygen</div><div id="u1_spo2" class="value">--<span class="unit-label">%</span></div></div>
-                <div class="card"><div class="label">Temp</div><div id="u1_temp" class="value">--<span class="unit-label">°C</span></div></div>
-                <div class="card"><div class="label">RSSI</div><div id="u1_rssi" class="value">--<span class="unit-label">dBm</span></div></div>
+    <div class="main-content">
+        <div id="nodeGrid" class="node-grid">
             </div>
-        </div>
 
-        <div class="unit-section">
-            <div id="u2Title" class="unit-title">UNIT 2 - REMOTE NODE</div>
-            <div class="dashboard">
-                <div class="card"><div class="label">Heart Rate</div><div id="u2_bpm" class="value">--<span class="unit-label">BPM</span></div></div>
-                <div class="card"><div class="label">Oxygen</div><div id="u2_spo2" class="value">--<span class="unit-label">%</span></div></div>
-                <div class="card"><div class="label">Temp</div><div id="u2_temp" class="value">--<span class="unit-label">°C</span></div></div>
-                <div class="card"><div class="label">RSSI</div><div id="u2_rssi" class="value">--<span class="unit-label">dBm</span></div></div>
-            </div>
+        <div class="chart-container">
+            <h4 id="graphTitle" style="color: var(--accent); margin-top: 0;">SELECT A UNIT TO GRAPH</h4>
+            <canvas id="healthChart" height="100"></canvas>
         </div>
-    </div>
-
-    <div class="chart-container">
-        <h3 style="text-align: left; color: var(--accent);">Live Telemetry Graph</h3>
-        <canvas id="healthChart"></canvas>
     </div>
 
     <script>
+        let units = [
+            { id: 1, name: "Unit 1", bpm: 0, spo2: 0, temp: 0, rssi: 0, history: [] }
+        ];
         let chart;
-        let u1Data = Array(20).fill(0);
-        let u2Data = Array(20).fill(0);
+        let activeGraphId = 1;
 
-        function renameUnits() {
-            const u1 = document.getElementById('u1NameInput').value;
-            const u2 = document.getElementById('u2NameInput').value;
-            if(u1) document.getElementById('u1Title').innerText = u1.toUpperCase();
-            if(u2) document.getElementById('u2Title').innerText = u2.toUpperCase();
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+        function renderUI() {
+            const grid = document.getElementById('nodeGrid');
+            const settingsList = document.getElementById('unitSettingsList');
+            grid.innerHTML = "";
+            settingsList.innerHTML = "";
+
+            units.forEach(u => {
+                // Render Cards
+                const card = document.createElement('div');
+                card.className = `unit-card ${activeGraphId === u.id ? 'active-graph' : ''}`;
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between">
+                        <strong style="color:var(--accent)">${u.name}</strong>
+                        <span style="font-size:0.7em; color:var(--text-dim)">ID: 0${u.id}</span>
+                    </div>
+                    <div class="metric-grid">
+                        <div class="metric" onclick="setActiveGraph(${u.id})">
+                            <div class="lab">Heart Rate</div>
+                            <div class="val">${u.bpm || '--'} <small style="font-size:0.4em">BPM</small></div>
+                        </div>
+                        <div class="metric">
+                            <div class="lab">Oxygen</div>
+                            <div class="val">${u.spo2 || '--'} <small style="font-size:0.4em">%</small></div>
+                        </div>
+                        <div class="metric">
+                            <div class="lab">Temperature</div>
+                            <div class="val">${u.temp || '--'} <small style="font-size:0.4em">°C</small></div>
+                        </div>
+                        <div class="metric">
+                            <div class="lab">Signal</div>
+                            <div class="val">${u.rssi || '--'} <small style="font-size:0.4em">dBm</small></div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+
+                // Render Settings
+                const setItem = document.createElement('div');
+                setItem.className = "setting-item";
+                setItem.innerHTML = `
+                    <h4>Unit ID: 0${u.id}</h4>
+                    <input type="text" value="${u.name}" onchange="renameUnit(${u.id}, this.value)">
+                    <div style="display:flex; gap:10px">
+                        <button class="btn-sm" onclick="exportData(${u.id}, 'csv')">EXCEL (CSV)</button>
+                        <button class="btn-sm" onclick="exportData(${u.id}, 'txt')">TEXT</button>
+                    </div>
+                    <span class="remove-btn" onclick="removeUnit(${u.id})">Remove Unit</span>
+                `;
+                settingsList.appendChild(setItem);
+            });
+            
+            const activeUnit = units.find(u => u.id === activeGraphId);
+            if(activeUnit) document.getElementById('graphTitle').innerText = "LIVE GRAPH: " + activeUnit.name.toUpperCase();
         }
 
-        async function initSerial() {
-            try {
-                const port = await navigator.serial.requestPort();
-                await port.open({ baudRate: 115200 });
-                document.getElementById('connectionStatus').innerText = "Receiver: ONLINE";
-                document.getElementById('connectionStatus').style.color = "#00ff88";
-                
-                setupChart();
-                const reader = port.readable.getReader();
-                const decoder = new TextDecoder();
-                let buffer = "";
+        function addNewUnit() {
+            const nextId = units.length > 0 ? Math.max(...units.map(u => u.id)) + 1 : 1;
+            units.push({ id: nextId, name: `Unit ${nextId}`, bpm: 0, spo2: 0, temp: 0, rssi: 0, history: [] });
+            renderUI();
+        }
 
-                while (true) {
-                    const { value, done } = await reader.read();
-                    buffer += decoder.decode(value);
-                    if (buffer.includes('\n')) {
-                        let lines = buffer.split('\n');
-                        buffer = lines.pop(); 
-                        lines.forEach(line => {
-                            try {
-                                const json = JSON.parse(line);
-                                updateUI(json);
-                            } catch(e) {}
-                        });
-                    }
+        function removeUnit(id) {
+            units = units.filter(u => u.id !== id);
+            if (activeGraphId === id && units.length > 0) activeGraphId = units[0].id;
+            renderUI();
+        }
+
+        function renameUnit(id, newName) {
+            const unit = units.find(u => u.id === id);
+            if(unit) unit.name = newName;
+            renderUI();
+        }
+
+        function setActiveGraph(id) {
+            activeGraphId = id;
+            renderUI();
+            updateChart();
+        }
+
+        function exportData(id, format) {
+            const unit = units.find(u => u.id === id);
+            let content = format === 'csv' ? "Timestamp,BPM\n" : `Data Log for ${unit.name}\n\n`;
+            
+            unit.history.forEach((val, i) => {
+                content += format === 'csv' ? `${i},${val}\n` : `Reading ${i}: ${val} BPM\n`;
+            });
+
+            const blob = new Blob([content], { type: 'text/plain' });
+            const elem = window.document.createElement('a');
+            elem.href = window.URL.createObjectURL(blob);
+            elem.download = `${unit.name}_Data.${format}`;
+            document.body.appendChild(elem);
+            elem.click();
+            document.body.removeChild(elem);
+        }
+
+        // --- Serial & Chart Logic ---
+        async function initSerial() {
+            const port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 115200 });
+            setupChart();
+            const reader = port.readable.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            while (true) {
+                const { value, done } = await reader.read();
+                buffer += decoder.decode(value);
+                if (buffer.includes('\n')) {
+                    let lines = buffer.split('\n');
+                    buffer = lines.pop(); 
+                    lines.forEach(line => {
+                        try {
+                            const json = JSON.parse(line);
+                            const unit = units.find(u => u.id === json.id);
+                            if(unit) {
+                                unit.bpm = json.bpm; unit.spo2 = json.spo2; 
+                                unit.temp = json.temp; unit.rssi = json.rssi;
+                                unit.history.push(json.bpm);
+                                if(unit.history.length > 30) unit.history.shift();
+                                if(unit.id === activeGraphId) updateChart();
+                            }
+                            renderUI();
+                        } catch(e) {}
+                    });
                 }
-            } catch (err) {
-                alert("Serial Connection Failed. Try again.");
             }
         }
 
@@ -145,42 +232,21 @@
             const ctx = document.getElementById('healthChart').getContext('2d');
             chart = new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: Array(20).fill(''),
-                    datasets: [
-                        { label: 'Unit 1 BPM', data: u1Data, borderColor: '#00ff88', tension: 0.4, fill: false },
-                        { label: 'Unit 2 BPM', data: u2Data, borderColor: '#00aaff', tension: 0.4, fill: false }
-                    ]
-                },
-                options: { 
-                    responsive: true, 
-                    animation: false,
-                    scales: { y: { min: 40, max: 160, grid: { color: '#30363d' } } }
-                }
+                data: { labels: Array(30).fill(''), datasets: [{ label: 'Heart Rate', data: [], borderColor: '#00ff88', tension: 0.4 }] },
+                options: { animation: false, scales: { y: { min: 40, max: 160 } } }
             });
         }
 
-        function updateUI(json) {
-            const id = json.id || 1;
-            const prefix = "u" + id + "_";
-            
-            if(json.bpm) document.getElementById(prefix + 'bpm').innerHTML = json.bpm + '<span class="unit-label">BPM</span>';
-            if(json.spo2) document.getElementById(prefix + 'spo2').innerHTML = json.spo2 + '<span class="unit-label">%</span>';
-            if(json.temp) document.getElementById(prefix + 'temp').innerHTML = json.temp + '<span class="unit-label">°C</span>';
-            if(json.rssi) document.getElementById(prefix + 'rssi').innerHTML = json.rssi + '<span class="unit-label">dBm</span>';
-
-            // Graph Update
-            if(json.bpm) {
-                if(id === 1) {
-                    u1Data.push(json.bpm);
-                    u1Data.shift();
-                } else {
-                    u2Data.push(json.bpm);
-                    u2Data.shift();
-                }
+        function updateChart() {
+            const unit = units.find(u => u.id === activeGraphId);
+            if(chart && unit) {
+                chart.data.datasets[0].data = unit.history;
                 chart.update();
             }
         }
+
+        // Initial Boot
+        renderUI();
     </script>
 </body>
 </html>
