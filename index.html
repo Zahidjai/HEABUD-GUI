@@ -24,8 +24,8 @@
         .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
         
         /* Settings Elements */
-        .setting-item { margin-bottom: 25px; padding: 15px; background: var(--bg-color); border-radius: 8px; border: 1px solid var(--border); }
-        input { background: #1c2128; color: white; border: 1px solid var(--border); padding: 8px; width: 80%; border-radius: 4px; }
+        .setting-item { margin-bottom: 15px; padding: 15px; background: var(--bg-color); border-radius: 8px; border: 1px solid var(--border); }
+        input { background: #1c2128; color: white; border: 1px solid var(--border); padding: 8px; width: 90%; border-radius: 4px; margin-top: 5px; }
 
         /* Main Dashboard */
         .main-content { padding: 40px; }
@@ -40,17 +40,23 @@
         .rescue-text { color: var(--accent); font-weight: bold; font-size: 0.8em; margin-bottom: 5px; display: none; }
         
         .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .metric { background: var(--bg-color); padding: 15px; border-radius: 10px; text-align: center; cursor: pointer; transition: 0.2s; }
-        .metric.alert-red { background: var(--danger) !important; color: white; }
+        .metric { background: var(--bg-color); padding: 15px; border-radius: 10px; text-align: center; cursor: pointer; transition: 0.2s; border: 2px solid transparent; }
+        .metric:hover { border-color: rgba(0, 255, 136, 0.3); }
+        .metric.alert-red { background: var(--danger) !important; color: white; border-color: var(--danger); }
+        .metric.box-active { border-color: var(--accent); box-shadow: 0 0 10px rgba(0, 255, 136, 0.15); }
         
         .val { font-size: 1.8em; font-weight: bold; }
+        .val-error { font-size: 1.3em; font-weight: bold; color: var(--danger); }
         .lab { font-size: 0.6em; color: var(--text-dim); text-transform: uppercase; }
 
         /* Emergency Popup */
         #emergencyPopup { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--danger); color: white; padding: 40px; border-radius: 20px; z-index: 1000; text-align: center; box-shadow: 0 0 100px rgba(255,0,0,0.5); width: 300px; }
         
-        button { background: var(--accent); color: var(--bg-color); border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        button { background: var(--accent); color: var(--bg-color); border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { filter: brightness(1.2); }
         .btn-assist { background: white; color: var(--danger); margin-top: 20px; width: 100%; font-size: 1.2em; }
+        .btn-sidebar { width: 100%; margin-top: 15px; }
+        .btn-export { background: #30363d; color: white; border: 1px solid var(--text-dim); }
 
         .chart-container { margin-top: 40px; background: var(--card-bg); padding: 20px; border-radius: 15px; border: 1px solid var(--border); }
     </style>
@@ -75,26 +81,46 @@
     </div>
 
     <div id="sidebar">
-        <div class="sidebar-header"><h3>Configuration</h3><i class="ph ph-x" style="cursor:pointer" onclick="toggleSidebar()"></i></div>
+        <div class="sidebar-header"><h3>Configuration</h3><i class="ph ph-x" style="cursor:pointer; font-size:20px;" onclick="toggleSidebar()"></i></div>
         <div id="unitSettingsList"></div>
-        <button style="width:100%" onclick="addNewUnit()">+ ADD NEW UNIT</button>
+        <button class="btn-sidebar" onclick="addNewUnit()">+ ADD NEW UNIT</button>
+        <button class="btn-sidebar btn-export" onclick="exportCSV()"><i class="ph ph-download-simple"></i> EXPORT 30-MIN LOG (CSV)</button>
     </div>
 
     <div class="main-content">
         <div id="nodeGrid" class="node-grid"></div>
         <div class="chart-container">
-            <h4 id="graphTitle" style="color: var(--accent); margin-top: 0;">SELECT A UNIT TO GRAPH</h4>
+            <h4 id="graphTitle" style="color: var(--accent); margin-top: 0;">SELECT A MEASUREMENT TO GRAPH</h4>
             <canvas id="healthChart" height="100"></canvas>
         </div>
     </div>
 
 <script>
     let units = [{ id: 1, name: "Unit 1", bpm: 0, spo2: 0, temp: 0, rssi: 0, history: [], assisted: false }];
-    let chart; let activeGraphId = 1;
+    let chart; 
+    let activeGraphId = 1;
+    let activeGraphMetric = 'bpm'; // 'bpm', 'spo2', 'temp', 'rssi'
     let audioCtx;
     let beepInterval;
 
-    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+    const metricConfigs = {
+        'bpm':  { label: 'Heart Rate (BPM)', color: '#00ff88', min: 40, max: 180 },
+        'spo2': { label: 'Oxygen Saturation (%)', color: '#00aaff', min: 80, max: 100 },
+        'temp': { label: 'Body Temperature (°C)', color: '#ffcc00', min: 32, max: 42 },
+        'rssi': { label: 'LoRa Signal (dBm)', color: '#bbaaff', min: -140, max: -30 }
+    };
+
+    function toggleSidebar() { 
+        document.getElementById('sidebar').classList.toggle('open'); 
+        renderSettings(); // Refresh settings UI when opened
+    }
+
+    function setActiveGraph(unitId, metric) {
+        activeGraphId = unitId;
+        activeGraphMetric = metric;
+        updateChart();
+        renderUI(); // Re-render to update the highlighted box
+    }
 
     function checkAlarms(u) {
         let badCount = 0;
@@ -105,131 +131,47 @@
         return { badCount, alerts };
     }
 
-    function renderUI() {
-        const grid = document.getElementById('nodeGrid');
-        const settingsList = document.getElementById('unitSettingsList');
-        grid.innerHTML = ""; settingsList.innerHTML = "";
-
+    // --- Configuration Logic ---
+    function renderSettings() {
+        const list = document.getElementById('unitSettingsList');
+        list.innerHTML = "";
         units.forEach(u => {
-            const { badCount, alerts } = checkAlarms(u);
-            let cardClass = "unit-card";
-            if (badCount === 1) cardClass += " status-yellow";
-            if (badCount >= 2) cardClass += " status-red";
-
-            const card = document.createElement('div');
-            card.className = cardClass;
-            card.innerHTML = `
-                <div class="rescue-text" style="display:${u.assisted ? 'block' : 'none'}">SIGNAL TO THE RESCUE TEAM SENT</div>
-                <div style="display:flex; justify-content:space-between">
-                    <strong style="color:var(--accent)">${u.name}</strong>
-                    <span style="font-size:0.7em; color:var(--text-dim)">ID: 0${u.id}</span>
-                </div>
-                <div class="metric-grid">
-                    <div class="metric ${alerts.bpm ? 'alert-red' : ''}" onclick="setActiveGraph(${u.id})">
-                        <div class="lab">Heart Rate</div><div class="val">${u.bpm || '--'}</div>
-                    </div>
-                    <div class="metric ${alerts.spo2 ? 'alert-red' : ''}">
-                        <div class="lab">Oxygen %</div><div class="val">${u.spo2 || '--'}</div>
-                    </div>
-                    <div class="metric ${alerts.temp ? 'alert-red' : ''}">
-                        <div class="lab">Temp °C</div><div class="val">${u.temp || '--'}</div>
-                    </div>
-                    <div class="metric">
-                        <div class="lab">Signal dBm</div><div class="val">${u.rssi || '--'}</div>
-                    </div>
-                </div>
+            const div = document.createElement('div');
+            div.className = "setting-item";
+            div.innerHTML = `
+                <label style="font-size:0.8em;color:var(--text-dim);font-weight:bold;">UNIT 0${u.id} NAME</label><br>
+                <input type="text" value="${u.name}" onchange="renameUnit(${u.id}, this.value)">
             `;
-            grid.appendChild(card);
-            if (badCount >= 3 && !u.assisted) { triggerEmergency(u); }
+            list.appendChild(div);
         });
     }
 
-    function triggerEmergency(u) {
-        if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        document.getElementById('popupMsg').innerText = `${u.name.toUpperCase()} IN DANGER!`;
-        document.getElementById('emergencyPopup').style.display = "block";
-        if (!beepInterval) beepInterval = setInterval(playBeep, 500);
-    }
-
-    function playBeep() {
-        let osc = audioCtx.createOscillator();
-        let gain = audioCtx.createGain();
-        osc.connect(gain); gain.connect(audioCtx.destination);
-        osc.frequency.value = 880; osc.start();
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
-        osc.stop(audioCtx.currentTime + 0.5);
-    }
-
-    function handleAssist() {
-        clearInterval(beepInterval); beepInterval = null;
-        document.getElementById('emergencyPopup').style.display = "none";
-        units.forEach(u => { u.assisted = true; });
-        renderUI();
-    }
-
-    // --- UPDATED SERIAL CONNECTION LOGIC ---
-    async function initSerial() {
-        try {
-            const port = await navigator.serial.requestPort();
-            await port.open({ baudRate: 115200 });
-            setupChart();
-            
-            const reader = port.readable.getReader();
-            const decoder = new TextDecoder();
-            let lineBuffer = "";
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                
-                lineBuffer += decoder.decode(value);
-                let lines = lineBuffer.split("\n");
-                
-                // Keep the last partial line in the buffer
-                lineBuffer = lines.pop();
-
-                for (let line of lines) {
-                    line = line.trim();
-                    if (line.startsWith("{") && line.endsWith("}")) {
-                        try {
-                            const data = JSON.parse(line);
-                            let unit = units.find(u => u.id === data.id);
-                            if (unit) {
-                                unit.bpm = data.bpm;
-                                unit.spo2 = data.spo2;
-                                unit.temp = data.temp;
-                                unit.rssi = data.rssi;
-                                unit.history.push(data.bpm);
-                                if (unit.history.length > 30) unit.history.shift();
-                                if (unit.id === activeGraphId) updateChart();
-                            }
-                            renderUI();
-                        } catch (e) { console.error("JSON Error:", e); }
-                    }
-                }
-            }
-        } catch (err) { console.error("Serial Error:", err); }
-    }
-
-    function setupChart() {
-        const ctx = document.getElementById('healthChart').getContext('2d');
-        chart = new Chart(ctx, {
-            type: 'line',
-            data: { labels: Array(30).fill(''), datasets: [{ label: 'Heart Rate (BPM)', data: [], borderColor: '#00ff88', tension: 0.4 }] },
-            options: { animation: false, scales: { y: { min: 40, max: 180 } } }
-        });
-    }
-
-    function updateChart() {
-        const u = units.find(x => x.id === activeGraphId);
-        if(chart && u) { 
-            chart.data.datasets[0].data = u.history; 
-            document.getElementById('graphTitle').innerText = "GRAPHING: " + u.name.toUpperCase();
-            chart.update(); 
+    function renameUnit(id, newName) {
+        const u = units.find(x => x.id === id);
+        if (u) {
+            u.name = newName;
+            renderUI();
+            updateChart();
         }
     }
 
-    renderUI();
-</script>
-</body>
-</html>
+    function addNewUnit() {
+        const newId = units.length > 0 ? Math.max(...units.map(u => u.id)) + 1 : 1;
+        units.push({ id: newId, name: `Unit ${newId}`, bpm: 0, spo2: 0, temp: 0, rssi: 0, history: [], assisted: false });
+        renderSettings();
+        renderUI();
+    }
+
+    function exportCSV() {
+        const thirtyMinsAgo = Date.now() - (30 * 60 * 1000);
+        let csvContent = "Timestamp,Unit_ID,Unit_Name,BPM,SpO2,Temp_C,RSSI_dBm\n";
+        
+        units.forEach(u => {
+            const recentData = u.history.filter(h => h.time >= thirtyMinsAgo);
+            recentData.forEach(d => {
+                const dateStr = new Date(d.time).toISOString();
+                csvContent += `${dateStr},${u.id},${u.name},${d.bpm},${d.spo2},${d.temp},${d.rssi}\n`;
+            });
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv
