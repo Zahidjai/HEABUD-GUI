@@ -1,6 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HEABUD - Emergency Response Hub</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -100,12 +102,16 @@
     <div id="sidebar">
         <div class="sidebar-header"><h3>Configuration</h3><i class="ph ph-x" style="cursor:pointer; font-size:20px;" onclick="toggleSidebar()"></i></div>
         <div id="unitSettingsList"></div>
-        <button class="btn-sidebar" onclick="addNewUnit()">+ ADD NEW UNIT</button>
         <button class="btn-sidebar btn-export" onclick="exportCSV()"><i class="ph ph-download-simple"></i> EXPORT 30-MIN LOG (CSV)</button>
     </div>
 
     <div class="main-content">
-        <div id="nodeGrid" class="node-grid"></div>
+        <div id="nodeGrid" class="node-grid">
+            <div style="grid-column: 1/-1; text-align: center; color: var(--text-dim); padding: 40px; border: 1px dashed var(--border); border-radius: 10px;">
+                <p>No active transmitters detected yet.</p>
+                <p style="font-size: 0.85em;">Click <strong>CONNECT RECEIVER</strong> above to open the telemetry incoming serial stream channel.</p>
+            </div>
+        </div>
         <div class="chart-container">
             <h4 id="graphTitle" style="color: var(--accent); margin-top: 0;">SELECT A MEASUREMENT TO GRAPH</h4>
             <canvas id="healthChart" height="100"></canvas>
@@ -113,9 +119,10 @@
     </div>
 
 <script>
-    let units = [{ id: 1, name: "Unit 1", bpm: 0, spo2: 0, temp: 0, rssi: 0, history: [], assisted: false }];
+    // Empty array to accommodate dynamic plug-and-play auto-discovery of nodes
+    let units = [];
     let chart; 
-    let activeGraphId = 1;
+    let activeGraphId = null;
     let activeGraphMetric = 'bpm'; 
     let audioCtx;
     let beepInterval;
@@ -148,15 +155,21 @@
         return { badCount, alerts };
     }
 
-    // --- Unit Configurations Manager ---
+    // --- Unit Name Customizer Interface ---
     function renderSettings() {
         const list = document.getElementById('unitSettingsList');
         list.innerHTML = "";
+        
+        if (units.length === 0) {
+            list.innerHTML = `<div style="color:var(--text-dim); font-size:0.9em; text-align:center; padding:20px;">No nodes discovered yet.</div>`;
+            return;
+        }
+
         units.forEach(u => {
             const div = document.createElement('div');
             div.className = "setting-item";
             div.innerHTML = `
-                <label style="font-size:0.8em;color:var(--text-dim);font-weight:bold;">UNIT 0${u.id} NAME</label><br>
+                <label style="font-size:0.8em;color:var(--text-dim);font-weight:bold;">NODE [ID: ${u.id}] DISPLAY NAME</label><br>
                 <input type="text" value="${u.name}" onchange="renameUnit(${u.id}, this.value)">
             `;
             list.appendChild(div);
@@ -170,13 +183,6 @@
             renderUI();
             updateChart();
         }
-    }
-
-    function addNewUnit() {
-        const newId = units.length > 0 ? Math.max(...units.map(u => u.id)) + 1 : 1;
-        units.push({ id: newId, name: `Unit ${newId}`, bpm: 0, spo2: 0, temp: 0, rssi: 0, history: [], assisted: false });
-        renderSettings();
-        renderUI();
     }
 
     // --- Chronological Filtered Data Export Tool ---
@@ -202,8 +208,11 @@
         document.body.removeChild(link);
     }
 
+    // --- Dynamic User Interface Building Framework ---
     function renderUI() {
         const grid = document.getElementById('nodeGrid');
+        
+        if (units.length === 0) return; // Retain fallback message block if empty
         grid.innerHTML = "";
 
         units.forEach(u => {
@@ -228,9 +237,9 @@
             card.className = cardClass;
             card.innerHTML = `
                 <div class="rescue-text" style="display:${u.assisted ? 'block' : 'none'}">SIGNAL TO THE RESCUE TEAM SENT</div>
-                <div style="display:flex; justify-content:space-between">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
                     <strong style="color:var(--accent)">${u.name.toUpperCase()}</strong>
-                    <span style="font-size:0.7em; color:var(--text-dim)">ID: 0${u.id}</span>
+                    <span style="font-size:0.7em; color:var(--text-dim); background:#0b0e11; padding:3px 8px; border-radius:3px;">ID: ${u.id}</span>
                 </div>
                 <div class="metric-grid">
                     <div class="metric ${alerts.bpm ? 'alert-red' : ''} ${isBpmActive}" onclick="setActiveGraph(${u.id}, 'bpm')">
@@ -275,9 +284,8 @@
         renderUI();
     }
 
-    // --- Web Serial Stream Implementation ---
+    // --- Web Serial Stream & Plug-and-Play Discovery Implementation ---
     async function initSerial() {
-        // Secure context validation gate
         if (!navigator.serial) {
             alert("SECURITY RESTRICTION: The Web Serial API is blocked. \n\nYou cannot access raw hardware serial ports using the 'file://' layout directly from your local hard drive. \n\nFIX: Run this file using a local web server environment (e.g., VS Code 'Live Server' extension, Python HTTP server, or host it on an HTTPS environment).");
             return;
@@ -304,24 +312,42 @@
                     if (line.startsWith("{") && line.endsWith("}")) {
                         try {
                             const data = JSON.parse(line);
+                            
+                            // Scan structural database array for an existing ID match
                             let unit = units.find(u => u.id === data.id);
-                            if (unit) {
-                                unit.bpm = data.bpm;
-                                unit.spo2 = data.spo2;
-                                unit.temp = data.temp;
-                                unit.rssi = data.rssi;
+                            
+                            // PLUG AND PLAY AUTO-DISCOVERY INTERCEPTOR
+                            if (!unit) {
+                                unit = { 
+                                    id: data.id, 
+                                    name: `Unit ${data.id}`, 
+                                    bpm: 0, spo2: 0, temp: 0, rssi: 0, 
+                                    history: [], assisted: false 
+                                };
+                                units.push(unit);
                                 
-                                unit.history.push({
-                                    time: Date.now(),
-                                    bpm: data.bpm,
-                                    spo2: data.spo2,
-                                    temp: data.temp,
-                                    rssi: data.rssi
-                                });
-                                
-                                if (unit.history.length > 1800) unit.history.shift();
-                                if (unit.id === activeGraphId) updateChart();
+                                // Auto-focus the graphing canvas onto the first unit that connects
+                                if (activeGraphId === null) {
+                                    activeGraphId = data.id;
+                                }
                             }
+
+                            unit.bpm = data.bpm;
+                            unit.spo2 = data.spo2;
+                            unit.temp = data.temp;
+                            unit.rssi = data.rssi;
+                            
+                            unit.history.push({
+                                time: Date.now(),
+                                bpm: data.bpm,
+                                spo2: data.spo2,
+                                temp: data.temp,
+                                rssi: data.rssi
+                            });
+                            
+                            if (unit.history.length > 1800) unit.history.shift();
+                            if (unit.id === activeGraphId) updateChart();
+                            
                             renderUI();
                         } catch (e) { console.error("JSON Error:", e); }
                     }
@@ -342,6 +368,8 @@
     }
 
     function updateChart() {
+        if (activeGraphId === null) return;
+        
         const u = units.find(x => x.id === activeGraphId);
         if(chart && u) { 
             const config = metricConfigs[activeGraphMetric];
@@ -360,8 +388,7 @@
         }
     }
 
-    // Initialize Layout & Chart Object on Page Load Sequence
-    renderUI();
+    // Initialize UI Placeholder & Empty Chart on Page Load Sequence
     setupChart();
 </script>
 </body>
