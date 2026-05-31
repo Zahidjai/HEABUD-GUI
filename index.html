@@ -15,10 +15,25 @@
         
         header { padding: 20px 40px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-color); position: sticky; top: 0; z-index: 10; }
         .logo-group { display: flex; align-items: center; gap: 15px; }
-        .settings-btn { font-size: 24px; cursor: pointer; color: var(--text-dim); transition: 0.3s; }
-        .settings-btn:hover { color: var(--accent); transform: rotate(45deg); }
+        
+        /* Fixed Hitbox for Config Button Container */
+        .settings-btn-container { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            width: 40px; 
+            height: 40px; 
+            cursor: pointer; 
+            border-radius: 5px; 
+            border: 1px solid var(--border); 
+            background: var(--card-bg); 
+            transition: 0.3s; 
+        }
+        .settings-btn-container:hover { border-color: var(--accent); }
+        .settings-btn { font-size: 24px; color: var(--text-dim); transition: 0.3s; }
+        .settings-btn-container:hover .settings-btn { color: var(--accent); transform: rotate(45deg); }
 
-        /* Sidebar */
+        /* Sidebar Layout */
         #sidebar { position: fixed; right: -350px; top: 0; width: 300px; height: 100%; background: var(--card-bg); border-left: 1px solid var(--border); transition: 0.3s; padding: 25px; z-index: 100; overflow-y: auto; box-shadow: -10px 0 30px rgba(0,0,0,0.5); }
         #sidebar.open { right: 0; }
         .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
@@ -27,11 +42,11 @@
         .setting-item { margin-bottom: 15px; padding: 15px; background: var(--bg-color); border-radius: 8px; border: 1px solid var(--border); }
         input { background: #1c2128; color: white; border: 1px solid var(--border); padding: 8px; width: 90%; border-radius: 4px; margin-top: 5px; }
 
-        /* Main Dashboard */
+        /* Main Dashboard Grid */
         .main-content { padding: 40px; }
         .node-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
         
-        /* ALARM STATES */
+        /* Alarm Matrix Indicators */
         .unit-card { background: var(--card-bg); border-radius: 15px; border: 1px solid var(--border); padding: 20px; transition: 0.3s; position: relative; }
         .status-yellow { border: 3px solid var(--warning) !important; background: rgba(255, 204, 0, 0.05); }
         .status-red { border: 3px solid var(--danger) !important; background: rgba(255, 77, 77, 0.1); animation: pulse-red 1.5s infinite; }
@@ -46,10 +61,10 @@
         .metric.box-active { border-color: var(--accent); box-shadow: 0 0 10px rgba(0, 255, 136, 0.15); }
         
         .val { font-size: 1.8em; font-weight: bold; }
-        .val-error { font-size: 1.3em; font-weight: bold; color: var(--danger); }
+        .val-error { font-size: 1.3em; font-weight: bold; color: var(--danger); text-transform: uppercase; }
         .lab { font-size: 0.6em; color: var(--text-dim); text-transform: uppercase; }
 
-        /* Emergency Popup */
+        /* Incident Warning Screen Overlay */
         #emergencyPopup { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--danger); color: white; padding: 40px; border-radius: 20px; z-index: 1000; text-align: center; box-shadow: 0 0 100px rgba(255,0,0,0.5); width: 300px; }
         
         button { background: var(--accent); color: var(--bg-color); border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; }
@@ -70,7 +85,9 @@
         </div>
         <div style="display: flex; align-items: center; gap: 20px;">
             <button onclick="initSerial()">CONNECT RECEIVER</button>
-            <i class="ph ph-gear settings-btn" onclick="toggleSidebar()"></i>
+            <div class="settings-btn-container" onclick="toggleSidebar()" title="Open Configuration">
+                <i class="ph ph-gear settings-btn"></i>
+            </div>
         </div>
     </header>
 
@@ -99,7 +116,7 @@
     let units = [{ id: 1, name: "Unit 1", bpm: 0, spo2: 0, temp: 0, rssi: 0, history: [], assisted: false }];
     let chart; 
     let activeGraphId = 1;
-    let activeGraphMetric = 'bpm'; // 'bpm', 'spo2', 'temp', 'rssi'
+    let activeGraphMetric = 'bpm'; 
     let audioCtx;
     let beepInterval;
 
@@ -112,14 +129,14 @@
 
     function toggleSidebar() { 
         document.getElementById('sidebar').classList.toggle('open'); 
-        renderSettings(); // Refresh settings UI when opened
+        renderSettings(); 
     }
 
     function setActiveGraph(unitId, metric) {
         activeGraphId = unitId;
         activeGraphMetric = metric;
         updateChart();
-        renderUI(); // Re-render to update the highlighted box
+        renderUI(); 
     }
 
     function checkAlarms(u) {
@@ -131,7 +148,7 @@
         return { badCount, alerts };
     }
 
-    // --- Configuration Logic ---
+    // --- Unit Configurations Manager ---
     function renderSettings() {
         const list = document.getElementById('unitSettingsList');
         list.innerHTML = "";
@@ -162,6 +179,7 @@
         renderUI();
     }
 
+    // --- Chronological Filtered Data Export Tool ---
     function exportCSV() {
         const thirtyMinsAgo = Date.now() - (30 * 60 * 1000);
         let csvContent = "Timestamp,Unit_ID,Unit_Name,BPM,SpO2,Temp_C,RSSI_dBm\n";
@@ -174,4 +192,177 @@
             });
         });
 
-        const blob = new Blob([csvContent], { type: 'text/csv
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `HEABUD_Telemetry_Log_${new Date().getTime()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function renderUI() {
+        const grid = document.getElementById('nodeGrid');
+        grid.innerHTML = "";
+
+        units.forEach(u => {
+            const { badCount, alerts } = checkAlarms(u);
+            let cardClass = "unit-card";
+            if (badCount === 1) cardClass += " status-yellow";
+            if (badCount >= 2) cardClass += " status-red";
+
+            // Safety Data Validation Interceptor
+            const dispBpm = (!u.bpm || u.bpm === 0) ? `<div class="val-error">ERROR</div>` : `<div class="val">${u.bpm}</div>`;
+            const dispSpo2 = (!u.spo2 || u.spo2 === 0) ? `<div class="val-error">ERROR</div>` : `<div class="val">${u.spo2}</div>`;
+            const dispTemp = (!u.temp || u.temp === 0.0) ? `<div class="val-error">ERROR</div>` : `<div class="val">${u.temp}</div>`;
+            const dispRssi = (!u.rssi || u.rssi === 0) ? `<div class="val-error">ERROR</div>` : `<div class="val">${u.rssi}</div>`;
+
+            // Active Class Evaluators
+            const isBpmActive = (activeGraphId === u.id && activeGraphMetric === 'bpm') ? 'box-active' : '';
+            const isSpo2Active = (activeGraphId === u.id && activeGraphMetric === 'spo2') ? 'box-active' : '';
+            const isTempActive = (activeGraphId === u.id && activeGraphMetric === 'temp') ? 'box-active' : '';
+            const isRssiActive = (activeGraphId === u.id && activeGraphMetric === 'rssi') ? 'box-active' : '';
+
+            const card = document.createElement('div');
+            card.className = cardClass;
+            card.innerHTML = `
+                <div class="rescue-text" style="display:${u.assisted ? 'block' : 'none'}">SIGNAL TO THE RESCUE TEAM SENT</div>
+                <div style="display:flex; justify-content:space-between">
+                    <strong style="color:var(--accent)">${u.name.toUpperCase()}</strong>
+                    <span style="font-size:0.7em; color:var(--text-dim)">ID: 0${u.id}</span>
+                </div>
+                <div class="metric-grid">
+                    <div class="metric ${alerts.bpm ? 'alert-red' : ''} ${isBpmActive}" onclick="setActiveGraph(${u.id}, 'bpm')">
+                        <div class="lab">Heart Rate</div>${dispBpm}
+                    </div>
+                    <div class="metric ${alerts.spo2 ? 'alert-red' : ''} ${isSpo2Active}" onclick="setActiveGraph(${u.id}, 'spo2')">
+                        <div class="lab">Oxygen %</div>${dispSpo2}
+                    </div>
+                    <div class="metric ${alerts.temp ? 'alert-red' : ''} ${isTempActive}" onclick="setActiveGraph(${u.id}, 'temp')">
+                        <div class="lab">Temp °C</div>${dispTemp}
+                    </div>
+                    <div class="metric ${isRssiActive}" onclick="setActiveGraph(${u.id}, 'rssi')">
+                        <div class="lab">Signal dBm</div>${dispRssi}
+                    </div>
+                </div>
+            `;
+            grid.appendChild(card);
+            if (badCount >= 3 && !u.assisted) { triggerEmergency(u); }
+        });
+    }
+
+    function triggerEmergency(u) {
+        if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        document.getElementById('popupMsg').innerText = `${u.name.toUpperCase()} IN DANGER!`;
+        document.getElementById('emergencyPopup').style.display = "block";
+        if (!beepInterval) beepInterval = setInterval(playBeep, 500);
+    }
+
+    function playBeep() {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.frequency.value = 880; osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
+        osc.stop(audioCtx.currentTime + 0.5);
+    }
+
+    function handleAssist() {
+        clearInterval(beepInterval); beepInterval = null;
+        document.getElementById('emergencyPopup').style.display = "none";
+        units.forEach(u => { u.assisted = true; });
+        renderUI();
+    }
+
+    // --- Web Serial Stream Implementation ---
+    async function initSerial() {
+        // Secure context validation gate
+        if (!navigator.serial) {
+            alert("SECURITY RESTRICTION: The Web Serial API is blocked. \n\nYou cannot access raw hardware serial ports using the 'file://' layout directly from your local hard drive. \n\nFIX: Run this file using a local web server environment (e.g., VS Code 'Live Server' extension, Python HTTP server, or host it on an HTTPS environment).");
+            return;
+        }
+
+        try {
+            const port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 115200 });
+            
+            const reader = port.readable.getReader();
+            const decoder = new TextDecoder();
+            let lineBuffer = "";
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                
+                lineBuffer += decoder.decode(value);
+                let lines = lineBuffer.split("\n");
+                lineBuffer = lines.pop();
+
+                for (let line of lines) {
+                    line = line.trim();
+                    if (line.startsWith("{") && line.endsWith("}")) {
+                        try {
+                            const data = JSON.parse(line);
+                            let unit = units.find(u => u.id === data.id);
+                            if (unit) {
+                                unit.bpm = data.bpm;
+                                unit.spo2 = data.spo2;
+                                unit.temp = data.temp;
+                                unit.rssi = data.rssi;
+                                
+                                unit.history.push({
+                                    time: Date.now(),
+                                    bpm: data.bpm,
+                                    spo2: data.spo2,
+                                    temp: data.temp,
+                                    rssi: data.rssi
+                                });
+                                
+                                if (unit.history.length > 1800) unit.history.shift();
+                                if (unit.id === activeGraphId) updateChart();
+                            }
+                            renderUI();
+                        } catch (e) { console.error("JSON Error:", e); }
+                    }
+                }
+            }
+        } catch (err) { console.error("Serial Exception Handle:", err); }
+    }
+
+    // --- Charting Lifecycle Manager ---
+    function setupChart() {
+        const ctx = document.getElementById('healthChart').getContext('2d');
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: Array(30).fill(''), datasets: [{ label: 'Heart Rate (BPM)', data: [], borderColor: '#00ff88', tension: 0.4 }] },
+            options: { animation: false, scales: { y: { min: 40, max: 180 } } }
+        });
+        updateChart();
+    }
+
+    function updateChart() {
+        const u = units.find(x => x.id === activeGraphId);
+        if(chart && u) { 
+            const config = metricConfigs[activeGraphMetric];
+            
+            chart.data.datasets[0].label = config.label;
+            chart.data.datasets[0].borderColor = config.color;
+            chart.options.scales.y.min = config.min;
+            chart.options.scales.y.max = config.max;
+            
+            const displayHistory = u.history.slice(-30);
+            chart.data.labels = displayHistory.map(h => new Date(h.time).toLocaleTimeString([], {hour12: false, minute:'2-digit', second:'2-digit'}));
+            chart.data.datasets[0].data = displayHistory.map(h => h[activeGraphMetric]); 
+            
+            document.getElementById('graphTitle').innerText = `GRAPHING: ${u.name.toUpperCase()} — ${config.label.toUpperCase()}`;
+            chart.update(); 
+        }
+    }
+
+    // Initialize Layout & Chart Object on Page Load Sequence
+    renderUI();
+    setupChart();
+</script>
+</body>
+</html>
