@@ -18,21 +18,31 @@
         header { padding: 20px 40px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-color); position: sticky; top: 0; z-index: 10; }
         .logo-group { display: flex; align-items: center; gap: 15px; }
         
+        /* Fixed Header Controls Container Alignment Layout */
+        .header-controls { 
+            display: flex; 
+            align-items: center; 
+            justify-content: flex-end; 
+            gap: 15px; 
+            height: 42px; /* Uniform bounding envelope matching button heights */
+        }
+
         /* Fixed Hitbox for Config Button Container */
         .settings-btn-container { 
             display: flex; 
             align-items: center; 
             justify-content: center; 
-            width: 40px; 
-            height: 40px; 
+            width: 42px; 
+            height: 42px; 
+            box-sizing: border-box;
             cursor: pointer; 
             border-radius: 5px; 
             border: 1px solid var(--border); 
             background: var(--card-bg); 
             transition: 0.3s; 
         }
-        .settings-btn-container:hover { border-color: var(--accent); }
-        .settings-btn { font-size: 24px; color: var(--text-dim); transition: 0.3s; }
+        .settings-btn-container:hover { border-color: var(--accent); background: rgba(0, 255, 136, 0.05); }
+        .settings-btn { font-size: 24px; color: var(--text-dim); transition: 0.3s; display: block; }
         .settings-btn-container:hover .settings-btn { color: var(--accent); transform: rotate(45deg); }
 
         /* Sidebar Layout */
@@ -76,10 +86,10 @@
         /* Incident Warning Screen Overlay */
         #emergencyPopup { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--danger); color: white; padding: 40px; border-radius: 20px; z-index: 1000; text-align: center; box-shadow: 0 0 100px rgba(255,0,0,0.5); width: 300px; }
         
-        button { background: var(--accent); color: var(--bg-color); border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button { background: var(--accent); color: var(--bg-color); border: none; padding: 0 20px; height: 42px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; }
         button:hover { filter: brightness(1.2); }
-        .btn-assist { background: white; color: var(--danger); margin-top: 20px; width: 100%; font-size: 1.2em; }
-        .btn-sidebar { width: 100%; margin-top: 15px; }
+        .btn-assist { background: white; color: var(--danger); margin-top: 20px; width: 100%; font-size: 1.2em; height: auto; padding: 10px 20px; }
+        .btn-sidebar { width: 100%; margin-top: 15px; height: auto; padding: 12px 20px; }
         .btn-export { background: #30363d; color: white; border: 1px solid var(--text-dim); }
 
         .chart-container { margin-top: 40px; background: var(--card-bg); padding: 20px; border-radius: 15px; border: 1px solid var(--border); }
@@ -92,7 +102,7 @@
             <i class="ph ph-heartbeat" style="color: var(--accent); font-size: 28px;"></i>
             <h1>HEABUD HUB <span style="font-size: 0.5em; color: var(--text-dim);">EMERGENCY MODE</span></h1>
         </div>
-        <div style="display: flex; align-items: center; gap: 20px;">
+        <div class="header-controls">
             <button onclick="initSerial()">CONNECT RECEIVER</button>
             <div class="settings-btn-container" onclick="toggleSidebar()" title="Open Configuration">
                 <i class="ph ph-gear settings-btn"></i>
@@ -161,7 +171,6 @@
         return { badCount, alerts };
     }
 
-    // Dynamic Icon Allocator for Discrete battery tiers (0, 25, 50, 75, 100)
     function getBatteryComponent(batValue) {
         let iconClass = "ph-battery-empty";
         let colorClass = "bat-crit";
@@ -171,7 +180,6 @@
             return `<div class="battery-container bat-crit"><i class="ph ph-battery-warning"></i> N/A</div>`;
         }
 
-        // Structural validation to map incoming telemetry numbers to the nearest intended tier
         if (batValue >= 88) { iconClass = "ph-battery-full"; colorClass = "bat-good"; displayVal = "100%"; }
         else if (batValue >= 63) { iconClass = "ph-battery-high"; colorClass = "bat-good"; displayVal = "75%"; }
         else if (batValue >= 38) { iconClass = "ph-battery-medium"; colorClass = "bat-good"; displayVal = "50%"; }
@@ -253,7 +261,6 @@
             const isTempActive = (activeGraphId === u.id && activeGraphMetric === 'temp') ? 'box-active' : '';
             const isRssiActive = (activeGraphId === u.id && activeGraphMetric === 'rssi') ? 'box-active' : '';
 
-            // Inject dynamic battery HTML component block directly into card top layout row
             const batteryHTML = getBatteryComponent(u.bat);
 
             const card = document.createElement('div');
@@ -291,4 +298,123 @@
         if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         document.getElementById('popupMsg').innerText = `${u.name.toUpperCase()} IN DANGER!`;
         document.getElementById('emergencyPopup').style.display = "block";
-        if (!beepInterval) beepInterval = setInterval(playBeep, 500
+        if (!beepInterval) beepInterval = setInterval(playBeep, 500);
+    }
+
+    function playBeep() {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.frequency.value = 880; osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
+        osc.stop(audioCtx.currentTime + 0.5);
+    }
+
+    function handleAssist() {
+        clearInterval(beepInterval); beepInterval = null;
+        document.getElementById('emergencyPopup').style.display = "none";
+        units.forEach(u => { u.assisted = true; });
+        renderUI();
+    }
+
+    async function initSerial() {
+        if (!navigator.serial) {
+            alert("SECURITY RESTRICTION: The Web Serial API is blocked. \n\nYou cannot access raw hardware serial ports using the 'file://' layout directly from your local hard drive. \n\nFIX: Run this file using a local web server environment (e.g., VS Code 'Live Server' extension, Python HTTP server, or host it on an HTTPS environment).");
+            return;
+        }
+
+        try {
+            const port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 115200 });
+            
+            const reader = port.readable.getReader();
+            const decoder = new TextDecoder();
+            let lineBuffer = "";
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                
+                lineBuffer += decoder.decode(value);
+                let lines = lineBuffer.split("\n");
+                lineBuffer = lines.pop();
+
+                for (let line of lines) {
+                    line = line.trim();
+                    if (line.startsWith("{") && line.endsWith("}")) {
+                        try {
+                            const data = JSON.parse(line);
+                            let unit = units.find(u => u.id === data.id);
+                            
+                            if (!unit) {
+                                unit = { 
+                                    id: data.id, 
+                                    name: `Unit ${data.id}`, 
+                                    bpm: 0, spo2: 0, temp: 0, rssi: 0, bat: 100,
+                                    history: [], assisted: false 
+                                };
+                                units.push(unit);
+                                if (activeGraphId === null) { activeGraphId = data.id; }
+                            }
+
+                            unit.bpm = data.bpm;
+                            unit.spo2 = data.spo2;
+                            unit.temp = data.temp;
+                            unit.rssi = data.rssi;
+                            unit.bat = data.bat; 
+                            
+                            unit.history.push({
+                                time: Date.now(),
+                                bpm: data.bpm,
+                                spo2: data.spo2,
+                                temp: data.temp,
+                                rssi: data.rssi,
+                                bat: data.bat
+                            });
+                            
+                            if (unit.history.length > 1800) unit.history.shift();
+                            if (unit.id === activeGraphId) updateChart();
+                            
+                            renderUI();
+                        } catch (e) { console.error("JSON Error:", e); }
+                    }
+                }
+            }
+        } catch (err) { console.error("Serial Exception Handle:", err); }
+    }
+
+    function setupChart() {
+        const ctx = document.getElementById('healthChart').getContext('2d');
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: Array(30).fill(''), datasets: [{ label: 'Heart Rate (BPM)', data: [], borderColor: '#00ff88', tension: 0.4 }] },
+            options: { animation: false, scales: { y: { min: 40, max: 180 } } }
+        });
+        updateChart();
+    }
+
+    function updateChart() {
+        if (activeGraphId === null) return;
+        
+        const u = units.find(x => x.id === activeGraphId);
+        if(chart && u) { 
+            const config = metricConfigs[activeGraphMetric];
+            
+            chart.data.datasets[0].label = config.label;
+            chart.data.datasets[0].borderColor = config.color;
+            chart.options.scales.y.min = config.min;
+            chart.options.scales.y.max = config.max;
+            
+            const displayHistory = u.history.slice(-30);
+            chart.data.labels = displayHistory.map(h => new Date(h.time).toLocaleTimeString([], {hour12: false, minute:'2-digit', second:'2-digit'}));
+            chart.data.datasets[0].data = displayHistory.map(h => h[activeGraphMetric]); 
+            
+            document.getElementById('graphTitle').innerText = `GRAPHING: ${u.name.toUpperCase()} — ${config.label.toUpperCase()}`;
+            chart.update(); 
+        }
+    }
+
+    setupChart();
+</script>
+</body>
+</html>
