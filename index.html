@@ -56,6 +56,13 @@
 
         .rescue-text { color: var(--accent); font-weight: bold; font-size: 0.8em; margin-bottom: 5px; display: none; }
         
+        /* Battery Alignment Structural Styles */
+        .card-top-row { display: flex; justify-content: space-between; align-items: center; }
+        .battery-container { display: flex; align-items: center; gap: 6px; background: #0b0e11; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); font-size: 0.75em; font-weight: bold; }
+        .bat-crit { color: var(--danger); border-color: var(--danger); }
+        .bat-low { color: var(--warning); border-color: var(--warning); }
+        .bat-good { color: var(--accent); border-color: var(--border); }
+
         .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
         .metric { background: var(--bg-color); padding: 15px; border-radius: 10px; text-align: center; cursor: pointer; transition: 0.2s; border: 2px solid transparent; }
         .metric:hover { border-color: rgba(0, 255, 136, 0.3); }
@@ -119,7 +126,6 @@
     </div>
 
 <script>
-    // Empty array to accommodate dynamic plug-and-play auto-discovery of nodes
     let units = [];
     let chart; 
     let activeGraphId = null;
@@ -155,7 +161,26 @@
         return { badCount, alerts };
     }
 
-    // --- Unit Name Customizer Interface ---
+    // Dynamic Icon Allocator for Discrete battery tiers (0, 25, 50, 75, 100)
+    function getBatteryComponent(batValue) {
+        let iconClass = "ph-battery-empty";
+        let colorClass = "bat-crit";
+        let displayVal = "0%";
+
+        if (batValue === undefined || batValue === null) {
+            return `<div class="battery-container bat-crit"><i class="ph ph-battery-warning"></i> N/A</div>`;
+        }
+
+        // Structural validation to map incoming telemetry numbers to the nearest intended tier
+        if (batValue >= 88) { iconClass = "ph-battery-full"; colorClass = "bat-good"; displayVal = "100%"; }
+        else if (batValue >= 63) { iconClass = "ph-battery-high"; colorClass = "bat-good"; displayVal = "75%"; }
+        else if (batValue >= 38) { iconClass = "ph-battery-medium"; colorClass = "bat-good"; displayVal = "50%"; }
+        else if (batValue >= 13) { iconClass = "ph-battery-low"; colorClass = "bat-low"; displayVal = "25%"; }
+        else { iconClass = "ph-battery-empty"; colorClass = "bat-crit"; displayVal = "0%"; }
+
+        return `<div class="battery-container ${colorClass}"><i class="ph ${iconClass}"></i> ${displayVal}</div>`;
+    }
+
     function renderSettings() {
         const list = document.getElementById('unitSettingsList');
         list.innerHTML = "";
@@ -185,16 +210,15 @@
         }
     }
 
-    // --- Chronological Filtered Data Export Tool ---
     function exportCSV() {
         const thirtyMinsAgo = Date.now() - (30 * 60 * 1000);
-        let csvContent = "Timestamp,Unit_ID,Unit_Name,BPM,SpO2,Temp_C,RSSI_dBm\n";
+        let csvContent = "Timestamp,Unit_ID,Unit_Name,BPM,SpO2,Temp_C,RSSI_dBm,Battery_Pct\n";
         
         units.forEach(u => {
             const recentData = u.history.filter(h => h.time >= thirtyMinsAgo);
             recentData.forEach(d => {
                 const dateStr = new Date(d.time).toISOString();
-                csvContent += `${dateStr},${u.id},${u.name},${d.bpm},${d.spo2},${d.temp},${d.rssi}\n`;
+                csvContent += `${dateStr},${u.id},${u.name},${d.bpm},${d.spo2},${d.temp},${d.rssi},${d.bat || 0}\n`;
             });
         });
 
@@ -208,11 +232,9 @@
         document.body.removeChild(link);
     }
 
-    // --- Dynamic User Interface Building Framework ---
     function renderUI() {
         const grid = document.getElementById('nodeGrid');
-        
-        if (units.length === 0) return; // Retain fallback message block if empty
+        if (units.length === 0) return;
         grid.innerHTML = "";
 
         units.forEach(u => {
@@ -221,25 +243,29 @@
             if (badCount === 1) cardClass += " status-yellow";
             if (badCount >= 2) cardClass += " status-red";
 
-            // Safety Data Validation Interceptor
             const dispBpm = (!u.bpm || u.bpm === 0) ? `<div class="val-error">ERROR</div>` : `<div class="val">${u.bpm}</div>`;
             const dispSpo2 = (!u.spo2 || u.spo2 === 0) ? `<div class="val-error">ERROR</div>` : `<div class="val">${u.spo2}</div>`;
             const dispTemp = (!u.temp || u.temp === 0.0) ? `<div class="val-error">ERROR</div>` : `<div class="val">${u.temp}</div>`;
             const dispRssi = (!u.rssi || u.rssi === 0) ? `<div class="val-error">ERROR</div>` : `<div class="val">${u.rssi}</div>`;
 
-            // Active Class Evaluators
             const isBpmActive = (activeGraphId === u.id && activeGraphMetric === 'bpm') ? 'box-active' : '';
             const isSpo2Active = (activeGraphId === u.id && activeGraphMetric === 'spo2') ? 'box-active' : '';
             const isTempActive = (activeGraphId === u.id && activeGraphMetric === 'temp') ? 'box-active' : '';
             const isRssiActive = (activeGraphId === u.id && activeGraphMetric === 'rssi') ? 'box-active' : '';
 
+            // Inject dynamic battery HTML component block directly into card top layout row
+            const batteryHTML = getBatteryComponent(u.bat);
+
             const card = document.createElement('div');
             card.className = cardClass;
             card.innerHTML = `
                 <div class="rescue-text" style="display:${u.assisted ? 'block' : 'none'}">SIGNAL TO THE RESCUE TEAM SENT</div>
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <strong style="color:var(--accent)">${u.name.toUpperCase()}</strong>
-                    <span style="font-size:0.7em; color:var(--text-dim); background:#0b0e11; padding:3px 8px; border-radius:3px;">ID: ${u.id}</span>
+                <div class="card-top-row">
+                    <div>
+                        <strong style="color:var(--accent); font-size:1.1em;">${u.name.toUpperCase()}</strong>
+                        <div style="font-size:0.65em; color:var(--text-dim); margin-top:2px;">HARDWARE ID: ${u.id}</div>
+                    </div>
+                    ${batteryHTML}
                 </div>
                 <div class="metric-grid">
                     <div class="metric ${alerts.bpm ? 'alert-red' : ''} ${isBpmActive}" onclick="setActiveGraph(${u.id}, 'bpm')">
@@ -265,131 +291,4 @@
         if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         document.getElementById('popupMsg').innerText = `${u.name.toUpperCase()} IN DANGER!`;
         document.getElementById('emergencyPopup').style.display = "block";
-        if (!beepInterval) beepInterval = setInterval(playBeep, 500);
-    }
-
-    function playBeep() {
-        let osc = audioCtx.createOscillator();
-        let gain = audioCtx.createGain();
-        osc.connect(gain); gain.connect(audioCtx.destination);
-        osc.frequency.value = 880; osc.start();
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
-        osc.stop(audioCtx.currentTime + 0.5);
-    }
-
-    function handleAssist() {
-        clearInterval(beepInterval); beepInterval = null;
-        document.getElementById('emergencyPopup').style.display = "none";
-        units.forEach(u => { u.assisted = true; });
-        renderUI();
-    }
-
-    // --- Web Serial Stream & Plug-and-Play Discovery Implementation ---
-    async function initSerial() {
-        if (!navigator.serial) {
-            alert("SECURITY RESTRICTION: The Web Serial API is blocked. \n\nYou cannot access raw hardware serial ports using the 'file://' layout directly from your local hard drive. \n\nFIX: Run this file using a local web server environment (e.g., VS Code 'Live Server' extension, Python HTTP server, or host it on an HTTPS environment).");
-            return;
-        }
-
-        try {
-            const port = await navigator.serial.requestPort();
-            await port.open({ baudRate: 115200 });
-            
-            const reader = port.readable.getReader();
-            const decoder = new TextDecoder();
-            let lineBuffer = "";
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                
-                lineBuffer += decoder.decode(value);
-                let lines = lineBuffer.split("\n");
-                lineBuffer = lines.pop();
-
-                for (let line of lines) {
-                    line = line.trim();
-                    if (line.startsWith("{") && line.endsWith("}")) {
-                        try {
-                            const data = JSON.parse(line);
-                            
-                            // Scan structural database array for an existing ID match
-                            let unit = units.find(u => u.id === data.id);
-                            
-                            // PLUG AND PLAY AUTO-DISCOVERY INTERCEPTOR
-                            if (!unit) {
-                                unit = { 
-                                    id: data.id, 
-                                    name: `Unit ${data.id}`, 
-                                    bpm: 0, spo2: 0, temp: 0, rssi: 0, 
-                                    history: [], assisted: false 
-                                };
-                                units.push(unit);
-                                
-                                // Auto-focus the graphing canvas onto the first unit that connects
-                                if (activeGraphId === null) {
-                                    activeGraphId = data.id;
-                                }
-                            }
-
-                            unit.bpm = data.bpm;
-                            unit.spo2 = data.spo2;
-                            unit.temp = data.temp;
-                            unit.rssi = data.rssi;
-                            
-                            unit.history.push({
-                                time: Date.now(),
-                                bpm: data.bpm,
-                                spo2: data.spo2,
-                                temp: data.temp,
-                                rssi: data.rssi
-                            });
-                            
-                            if (unit.history.length > 1800) unit.history.shift();
-                            if (unit.id === activeGraphId) updateChart();
-                            
-                            renderUI();
-                        } catch (e) { console.error("JSON Error:", e); }
-                    }
-                }
-            }
-        } catch (err) { console.error("Serial Exception Handle:", err); }
-    }
-
-    // --- Charting Lifecycle Manager ---
-    function setupChart() {
-        const ctx = document.getElementById('healthChart').getContext('2d');
-        chart = new Chart(ctx, {
-            type: 'line',
-            data: { labels: Array(30).fill(''), datasets: [{ label: 'Heart Rate (BPM)', data: [], borderColor: '#00ff88', tension: 0.4 }] },
-            options: { animation: false, scales: { y: { min: 40, max: 180 } } }
-        });
-        updateChart();
-    }
-
-    function updateChart() {
-        if (activeGraphId === null) return;
-        
-        const u = units.find(x => x.id === activeGraphId);
-        if(chart && u) { 
-            const config = metricConfigs[activeGraphMetric];
-            
-            chart.data.datasets[0].label = config.label;
-            chart.data.datasets[0].borderColor = config.color;
-            chart.options.scales.y.min = config.min;
-            chart.options.scales.y.max = config.max;
-            
-            const displayHistory = u.history.slice(-30);
-            chart.data.labels = displayHistory.map(h => new Date(h.time).toLocaleTimeString([], {hour12: false, minute:'2-digit', second:'2-digit'}));
-            chart.data.datasets[0].data = displayHistory.map(h => h[activeGraphMetric]); 
-            
-            document.getElementById('graphTitle').innerText = `GRAPHING: ${u.name.toUpperCase()} — ${config.label.toUpperCase()}`;
-            chart.update(); 
-        }
-    }
-
-    // Initialize UI Placeholder & Empty Chart on Page Load Sequence
-    setupChart();
-</script>
-</body>
-</html>
+        if (!beepInterval) beepInterval = setInterval(playBeep, 500
